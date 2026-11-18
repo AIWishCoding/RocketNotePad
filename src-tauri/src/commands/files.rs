@@ -1426,7 +1426,8 @@ mod tests {
         // 超过 8MB 的 big.md 不进树（建树不读取内容，但按大小过滤）
         assert_eq!(child_names(&root), vec!["many"]);
         assert_eq!(find_node(&root, "many").unwrap().children.as_ref().unwrap().len(), 300);
-        assert!(elapsed.as_millis() < 3000, "16MB 目录树构建耗时 {elapsed:?}");
+        // CI 共享 runner 实测可达本机 4–6 倍耗时，阈值取 4 倍余量
+        assert!(elapsed.as_millis() < 12000, "16MB 目录树构建耗时 {elapsed:?}");
     }
 
     // ===================== I. create / rename / copy / delete =====================
@@ -1633,7 +1634,7 @@ mod tests {
         let elapsed = start.elapsed();
         println!("read 16MB in {:?}", elapsed);
         assert!(fc.content.len() > 16 * 1024 * 1024);
-        assert!(elapsed.as_millis() < 1500, "16MB read took {elapsed:?}");
+        assert!(elapsed.as_millis() < 6000, "16MB read took {elapsed:?}");
     }
 
     #[test]
@@ -1653,7 +1654,7 @@ mod tests {
         assert_eq!(fc.encoding, "UTF-16LE");
         assert_eq!(fc.line_ending, "\n");
         assert_eq!(fc.content, text);
-        assert!(elapsed.as_millis() < 3000, "16MB UTF-16 读取耗时 {elapsed:?}");
+        assert!(elapsed.as_millis() < 12000, "16MB UTF-16 读取耗时 {elapsed:?}");
     }
     // ---------- 性能优化点：前缀嗅探 / 原地归一化 / 只读阈值 ----------
 
@@ -1803,7 +1804,7 @@ mod tests {
         assert_eq!(fc.line_ending, "\r\n");
         assert_eq!(fc.content, text.replace("\r\n", "\n"));
         assert!(fc.content.contains("\u{4e2d}\u{534e}\u{4eba}\u{6c11}"));
-        assert!(elapsed.as_millis() < 2000, "16MB legacy 读取耗时 {elapsed:?}");
+        assert!(elapsed.as_millis() < 8000, "16MB legacy 读取耗时 {elapsed:?}");
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -1867,7 +1868,7 @@ mod tests {
         assert_eq!(fc.size, data.len() as u64);
         assert_eq!(fc.content.len(), data.len());
         assert_eq!(fc.line_ending, "\n");
-        assert!(elapsed.as_millis() < 1500, "9MB 读取耗时 {elapsed:?}");
+        assert!(elapsed.as_millis() < 6000, "9MB 读取耗时 {elapsed:?}");
         let _ = fs::remove_dir_all(&dir);
     }
 }
