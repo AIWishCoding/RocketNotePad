@@ -85,7 +85,7 @@ function featureGroups(): Array<{ title: string; tone: string; items: Feature[] 
       title: "编辑与标签",
       tone: "edit",
       items: [
-        { icon: "tabs", title: "多标签编辑", desc: "单击文件先用斜体预览标签占位，双击或改动后固定；中键关闭，未保存的标签带 ● 标记。" },
+        { icon: "tabs", title: "多标签编辑", desc: `单击文件先用斜体预览标签占位，双击或改动后固定；中键关闭，${shiftMod("W")} 一键关闭所有标签，未保存的标签带 ● 标记。` },
         { icon: "save", title: "停顿即存", desc: "停止输入 1.5 秒自动写回已保存的文件；失焦、切后台、关窗立即冲刷，未命名文件仍需手动保存。" },
         { icon: "search", title: "查找与替换", desc: "编辑器右上角浮窗，支持区分大小写、全词匹配、正则与匹配计数，可逐个替换或全部替换。" },
         { icon: "cursor", title: "顺手的选择", desc: `${mod("D")} 逐个选中相同项，多光标与列选择由编辑器提供；大段拖选逐帧合并，不掉帧。` },

@@ -422,3 +422,66 @@ describe("启动日志设置", () => {
     await until(() => !$q(".palette-overlay"));
   });
 });
+
+describe("关闭所有标签", () => {
+  it("命令面板列出“文件: 关闭所有标签”", async () => {
+    globalKey("p", { metaKey: true, shiftKey: true });
+    await until(() => !!$q(".palette-overlay .palette-input"));
+    const input = $q<HTMLInputElement>(".palette-overlay .palette-input");
+    input.value = "关闭所有";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush(10);
+    expect($qa(".palette-item")[0].textContent).toContain("文件: 关闭所有标签");
+    keydown(input, "Escape");
+    await until(() => !$q(".palette-overlay"));
+  });
+
+  it("⇧⌘W 一键关空所有标签并回到欢迎页", async () => {
+    await openFile("note.md");
+    await openFile("a.cpp");
+    expect(tabStates().length).toBeGreaterThanOrEqual(2);
+    globalKey("w", { metaKey: true, shiftKey: true });
+    await until(() => tabStates().length === 0);
+    expect($id("welcome").classList.contains("hidden")).toBe(false);
+    expect($id("editor-wrap").classList.contains("hidden")).toBe(true);
+    expect($id("st-pos").textContent).toBe("");
+  });
+
+  it("有未保存修改时统一询问一次，保存并关闭会写盘", async () => {
+    await openFile("note.md");
+    viewFromDom().dispatch({ changes: { from: 0, insert: "x" } });
+    await until(() => tab("note.md")?.dirty === true);
+    mock.dialogs.ask.length = 0;
+    mock.dialogs.ask.push(true);
+    const writes = mock.invokeLog("write_text_file").length;
+    await menu("file.close_all");
+    await until(() => tabStates().length === 0);
+    expect(mock.invokeLog("write_text_file").length).toBeGreaterThan(writes);
+    expect(mock.dialogs.ask).toEqual([]);
+  });
+
+  it("不保存→确认丢弃，关空且不写盘", async () => {
+    await openFile("note.md");
+    viewFromDom().dispatch({ changes: { from: 0, insert: "y" } });
+    await until(() => tab("note.md")?.dirty === true);
+    mock.dialogs.ask.length = 0;
+    mock.dialogs.ask.push(false, true);
+    const writes = mock.invokeLog("write_text_file").length;
+    await menu("file.close_all");
+    await until(() => tabStates().length === 0);
+    expect(mock.invokeLog("write_text_file").length).toBe(writes);
+  });
+
+  it("两次询问都取消则保留全部标签与修改标记", async () => {
+    await openFile("note.md");
+    viewFromDom().dispatch({ changes: { from: 0, insert: "z" } });
+    await until(() => tab("note.md")?.dirty === true);
+    const before = tabStates().length;
+    mock.dialogs.ask.length = 0;
+    mock.dialogs.ask.push(false, false);
+    await menu("file.close_all");
+    await flush(30);
+    expect(tabStates().length).toBe(before);
+    expect(tab("note.md")?.dirty).toBe(true);
+  });
+});

@@ -45,6 +45,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &item(app, "file.save_as", "另存为…", Some("Shift+CmdOrCtrl+S"))?,
             &PredefinedMenuItem::separator(app)?,
             &item(app, "file.close_tab", "关闭标签", Some("CmdOrCtrl+W"))?,
+            &item(app, "file.close_all", "关闭所有标签", Some("Shift+CmdOrCtrl+W"))?,
             &item(app, "app.quit", "退出 RocketNotePad", Some("CmdOrCtrl+Q"))?,
         ],
     )?;

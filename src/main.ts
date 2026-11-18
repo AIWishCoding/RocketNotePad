@@ -631,6 +631,41 @@ async function closeTab(id: number) {
   renderStatus();
 }
 
+/** 一键关闭所有标签：未保存修改沿用退出流程统一询问一次，不逐标签弹框 */
+async function closeAllTabs() {
+  if (!tabs.length) return;
+  syncActiveState();
+  await flushAllAutoSave();
+  const dirty = tabs.filter((t) => t.dirty);
+  if (dirty.length) {
+    const doSave = await ask(`有 ${dirty.length} 个文件未保存，是否保存后关闭？`, {
+      title: "关闭所有标签",
+      kind: "warning",
+      okLabel: "保存并关闭",
+      cancelLabel: "取消"
+    });
+    if (doSave) {
+      for (const t of [...dirty]) {
+        if (t.id !== activeId) switchTab(t.id);
+        if (!(await saveTab(t, false))) return;
+      }
+    } else {
+      const discard = await ask("确定丢弃所有未保存的修改并关闭吗？", {
+        title: "关闭所有标签",
+        kind: "warning",
+        okLabel: "丢弃",
+        cancelLabel: "取消"
+      });
+      if (!discard) return;
+    }
+  }
+  tabs = [];
+  activeId = -1;
+  renderTabs();
+  renderStatus();
+  persistSettings();
+}
+
 async function removeTabsByPath(path: string) {
   const affected = tabs.filter(
     (t) => t.path === path || t.path?.startsWith(path + "/") || t.path?.startsWith(path + "\\")
@@ -786,6 +821,7 @@ function commands(): Command[] {
     { id: "file.save", title: "文件: 保存", hint: mod("S"), run: () => { const t = activeTab(); if (t) saveTab(t, false); } },
     { id: "file.save_as", title: "文件: 另存为…", hint: shiftMod("S"), run: () => { const t = activeTab(); if (t) saveTab(t, true); } },
     { id: "file.close_tab", title: "文件: 关闭标签", hint: mod("W"), run: () => { if (activeId >= 0) closeTab(activeId); } },
+    { id: "file.close_all", title: "文件: 关闭所有标签", hint: shiftMod("W"), run: () => void closeAllTabs() },
     {
       id: "file.autosave",
       title: `文件: 自动保存（当前${settings.autoSave ? "开启" : "关闭"}）`,
@@ -835,6 +871,7 @@ function handleMenu(id: string) {
     case "file.save": { const t = activeTab(); if (t) saveTab(t, false); break; }
     case "file.save_as": { const t = activeTab(); if (t) saveTab(t, true); break; }
     case "file.close_tab": if (activeId >= 0) closeTab(activeId); break;
+    case "file.close_all": void closeAllTabs(); break;
     case "app.quit": getCurrentWindow().close(); break;
     case "find.open": if (tabs.length) openSearchPanel(view); break;
     case "find.replace": if (tabs.length) openReplacePanel(view); break;
@@ -944,6 +981,9 @@ function wireEvents() {
       e.preventDefault();
       const t = activeTab();
       if (t) saveTab(t, true);
+    } else if (key === "w" && e.shiftKey) {
+      e.preventDefault();
+      void closeAllTabs();
     } else if (key === "w") {
       e.preventDefault();
       if (activeId >= 0) closeTab(activeId);
