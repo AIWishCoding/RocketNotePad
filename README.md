@@ -130,4 +130,4 @@ CI 由 GitHub Actions 承担：`push` 到 master 与 PR 跑全量测试（test.y
 
 ## 许可
 
-许可证尚未正式声明；在此之前，请默认保留所有权利。
+本项目基于 [Apache License 2.0](LICENSE) 开源发布，Copyright 2026 maple。

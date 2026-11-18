@@ -6,6 +6,7 @@ authors = ["maple"]
 default-run = "rocketnotepad"
 edition = "2021"
 rust-version = "1.82"
+license = "Apache-2.0"
 
 [lib]
 name = "rocketnotepad_lib"
