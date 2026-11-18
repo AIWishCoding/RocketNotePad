@@ -331,6 +331,10 @@ describe("打开对话框", () => {
     await menu("file.open_folder");
     await until(() => mock.invokeLog("list_folder_tree").length > before);
     await until(() => (mock.configJson()?.folders as string[])?.includes("/demo") ?? false);
+    // openFolder 还会后台把目录里全部文本文件逐个开成标签（按 list_text_files 顺序，
+    // 新标签只到 Two.TXT，后面仅剩对已存在 readme.md 的同任务切换）。不等它跑完，
+    // 残余的 switchTab 会切走活动标签，把后续测试刚打开的查找面板连状态一起冲掉。
+    await until(() => !!tab("Two.TXT"));
   });
 
   it("打开不存在的文件时提示“打开失败”", async () => {
@@ -345,7 +349,17 @@ describe("打开对话框", () => {
   it("查找浮窗默认收起替换行，⌥⌘E 展开并可换行导航", async () => {
     await openFile("note.md");
     await menu("find.open");
-    await until(() => !!$q(".rnp-find"));
+    await until(() => !!$q(".rnp-find"), 10000, 10, () =>
+      [
+        `tabs=${JSON.stringify(tabStates())}`,
+        `editors=${$qa(".cm-editor").length}`,
+        `panels=${$qa(".cm-panels").length}:${$qa(".cm-panel").length}`,
+        `panelCls=${$qa(".cm-panel").map((p) => p.className).join("+")}`,
+        `active=${document.activeElement?.tagName}.${document.activeElement?.className ?? ""}`,
+        `msgs=${JSON.stringify(mock.messages.slice(-2))}`,
+        `cmds=${JSON.stringify(mock.calls.slice(-6).map((c) => c.cmd))}`
+      ].join(" | ")
+    );
     const find = $q<HTMLInputElement>(".rnp-find-input")!;
     expect(find.placeholder).toBe("查找");
     expect($q(".rnp-find-row.hidden")).toBeTruthy();

@@ -13,10 +13,25 @@ export function flush(ms = 0): Promise<void> {
 }
 
 /** 轮询等待条件成立，用于等待 main() 里的异步启动流程；CI 慢机上 3 秒不够，取 10 秒 */
-export async function until(condition: () => boolean, timeout = 10000, step = 10): Promise<void> {
+export async function until(
+  condition: () => boolean,
+  timeout = 10000,
+  step = 10,
+  diagnose?: () => string
+): Promise<void> {
   const start = Date.now();
   while (!condition()) {
-    if (Date.now() - start > timeout) throw new Error("等待超时: 页面状态未达到预期");
+    if (Date.now() - start > timeout) {
+      let extra = "";
+      if (diagnose) {
+        try {
+          extra = ` — ${diagnose()}`;
+        } catch (e) {
+          extra = `（诊断本身失败: ${e}）`;
+        }
+      }
+      throw new Error(`等待超时: 页面状态未达到预期${extra}`);
+    }
     await flush(step);
   }
 }
