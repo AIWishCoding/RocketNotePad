@@ -1,6 +1,6 @@
 [package]
 name = "rocketnotepad"
-version = "0.2.4"
+version = "0.2.5"
 description = "A fast, lightweight local note pad - Notepad++ style"
 authors = ["maple"]
 default-run = "rocketnotepad"
