@@ -37,6 +37,8 @@ const DEFAULT_VIEW = {
   minimap: true,
   sidebarVisible: true,
   startupLog: false,
+  editLimitMB: 64,
+  maxFileMB: 256,
   folders: [],
   restoreTabs: [],
   restoreActive: ""
@@ -53,6 +55,23 @@ describe("配置默认值", () => {
     const { mod } = await load();
     expect(mod.DEFAULT_FONT_SIZE).toBe(15);
     expect(mod.cfg.fontSize).toBe(15);
+  });
+});
+
+describe("文件大小档位", () => {
+  it("默认 64/256 MB，非法值回默认", async () => {
+    const { cfg } = await load();
+    expect(cfg.editLimitMB).toBe(64);
+    expect(cfg.maxFileMB).toBe(256);
+    const bad = await load({ config: { editLimitMB: 0, maxFileMB: "x" } });
+    expect(bad.cfg.editLimitMB).toBe(64);
+    expect(bad.cfg.maxFileMB).toBe(256);
+  });
+
+  it("配置文件里的合法档位覆盖默认", async () => {
+    const { cfg } = await load({ config: { editLimitMB: 8, maxFileMB: 64 } });
+    expect(cfg.editLimitMB).toBe(8);
+    expect(cfg.maxFileMB).toBe(64);
   });
 });
 
@@ -84,6 +103,8 @@ describe("读取配置文件", () => {
       minimap: false,
       sidebarVisible: false,
       startupLog: true,
+      editLimitMB: 64,
+      maxFileMB: 256,
       folders: ["/demo"],
       restoreTabs: ["/demo/a.md"],
       restoreActive: "/demo/a.md"
@@ -199,6 +220,8 @@ describe("从旧版 localStorage 迁移", () => {
       minimap: false,
       sidebarVisible: false,
       startupLog: false,
+      editLimitMB: 64,
+      maxFileMB: 256,
       folders: ["/demo"],
       restoreTabs: ["/demo/note.md"],
       restoreActive: "/demo/note.md"

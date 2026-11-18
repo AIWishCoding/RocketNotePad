@@ -42,8 +42,8 @@ beforeAll(async () => {
 });
 
 describe("超大文件只读打开", () => {
-  it("默认阈值就是后端的 8 MiB", () => {
-    expect(EDIT_SIZE_LIMIT).toBe(8 * 1024 * 1024);
+  it("默认阈值就是后端的 64 MiB", () => {
+    expect(EDIT_SIZE_LIMIT).toBe(64 * 1024 * 1024);
   });
 
   it("超过阈值的文件以只读打开并在状态栏标注", async () => {

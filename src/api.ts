@@ -37,8 +37,16 @@ export function appInfo(): Promise<AppInfo> {
   return invoke<AppInfo>("app_info");
 }
 
-export function readTextFile(path: string): Promise<FileContent> {
-  return invoke<FileContent>("read_text_file", { path });
+export function readTextFile(path: string, editLimitMb?: number, maxFileMb?: number): Promise<FileContent> {
+  return invoke<FileContent>("read_text_file", {
+    path,
+    ...(editLimitMb != null ? { editLimitMb } : {}),
+    ...(maxFileMb != null ? { maxFileMb } : {})
+  });
+}
+
+export function refreshSizeMenu(editLimitMb: number, maxFileMb: number): Promise<void> {
+  return invoke<void>("refresh_size_menu", { editLimitMb, maxFileMb });
 }
 
 export function writeTextFile(
@@ -63,8 +71,8 @@ export function isDirectory(path: string): Promise<boolean> {
   return invoke<boolean>("is_directory", { path });
 }
 
-export function listTextFiles(dir: string): Promise<string[]> {
-  return invoke<string[]>("list_text_files", { dir });
+export function listTextFiles(dir: string, editLimitMb?: number): Promise<string[]> {
+  return invoke<string[]>("list_text_files", { dir, ...(editLimitMb != null ? { editLimitMb } : {}) });
 }
 
 export interface TreeNode {

@@ -26,7 +26,7 @@
 - 文件夹式工作流：可同时挂载多个文件夹，树内新建、重命名、复制粘贴、拖拽移动，右键菜单全中文
 - 删除走系统回收站，误删可还原；退出前统一询问未保存的修改
 - 自动嗅探 UTF-8 / UTF-16 / GB18030 / Big5 / Shift_JIS / EUC-KR，保存时保持原编码与换行风格
-- 超过 8 MB 的文件按只读打开并封顶内存，状态栏明确标注
+- 大文件三档：默认 ≤64 MB 可编辑、64–256 MB 只读、>256 MB 拒绝；文件菜单「可编辑上限 / 只读上限」可调，写入配置文件
 
 **外观与会话**
 
@@ -56,6 +56,7 @@
 |------|------|
 | macOS | Apple Silicon 或 Intel（分别提供 aarch64 / x64 安装包，另附 universal 通用包） |
 | Windows | Windows 10 1803 及以上 / Windows 11 / Windows Server 2019+（x64），需 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)（较新系统已内置，安装包会自动引导下载） |
+| Linux | Ubuntu 22.04 及以上（x86_64），deb / AppImage，依赖 WebKitGTK 4.1（deb 会自动装依赖） |
 
 ## 下载安装
 
@@ -65,6 +66,8 @@
 - `RocketNotePad_x.x.x_x64.dmg` — macOS（Intel 芯片）
 - `RocketNotePad_x.x.x_universal.dmg` — macOS 通用包（两种芯片皆可，不确定芯片时选它）
 - `RocketNotePad_x.x.x_x64-setup.exe` — Windows 安装程序
+- `rocketnotepad_x.x.x_amd64.deb` — Ubuntu / Debian（x86_64）
+- `RocketNotePad_x.x.x_amd64.AppImage` — Linux 通用免安装（x86_64）
 
 > 本应用未做 Apple 公证。若首次打开被 macOS 拦截提示「文件已损坏」，在终端执行：
 >
@@ -101,6 +104,9 @@ npm run tauri build -- --target universal-apple-darwin
 
 # Windows 安装包（.exe，位于 src-tauri/target/release/bundle/nsis/）
 npm run tauri build
+
+# Linux（需 Linux 主机；deb 与 AppImage，CI 在打 tag 时自动产出并挂到 Release）
+npm run tauri build -- --bundles deb,appimage
 ```
 
 在 macOS 上交叉打包 Windows 产物需 `cargo-xwin`，详见 [BUILD.md](BUILD.md)。
@@ -148,7 +154,7 @@ CI 由 GitHub Actions 承担：`push` 到 master 与 PR 跑全量测试（test.y
 
 ## 版本
 
-当前版本 **0.2.4**。版本号同步维护于 `package.json`、`src-tauri/Cargo.toml` 与 `src-tauri/tauri.conf.json`，由测试保证三处一致。
+当前版本 **0.2.5**。版本号同步维护于 `package.json`、`src-tauri/Cargo.toml` 与 `src-tauri/tauri.conf.json`，由测试保证三处一致。
 
 ## 许可
 

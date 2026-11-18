@@ -67,6 +67,8 @@ export interface TauriMockOptions {
    * 用例可以用小阈值触发只读逻辑，避免在 jsdom 里真的造几十兆文本。
    */
   largeFileLimit?: number;
+  /** 拒绝打开的硬上限（字节），对齐 Rust MAX_FILE_SIZE；不给则 256 MiB */
+  maxFileLimit?: number;
   /**
    * 配置文件初始内容（应用目录那份 JSON，macOS 是 `~/.rocketnote`）；字符串按原样写入，
    * 对象会序列化。不给则视为文件还不存在，前端会走 localStorage 迁移分支。
@@ -87,7 +89,9 @@ export const APP_EXE_PATH = "/Applications/RocketNotePad.app/Contents/MacOS/rock
 export const STARTUP_LOG_PATH = "/Users/maple/.rocketnote/rocketnotepad.startup.log";
 
 /** 与 Rust files.rs 的 EDIT_SIZE_LIMIT 一致 */
-export const EDIT_SIZE_LIMIT = 8 * 1024 * 1024;
+export const EDIT_SIZE_LIMIT = 64 * 1024 * 1024;
+/** 与 Rust files.rs 的 MAX_FILE_SIZE 一致 */
+export const MAX_FILE_LIMIT = 256 * 1024 * 1024;
 
 const TEXT_EXT = new Set([
   "txt", "md", "markdown", "mdown", "mkd", "log", "json", "jsonc", "yaml", "yml", "toml",
@@ -210,17 +214,18 @@ export class VirtualFs {
   }
 
   /** 模拟 scan_dir：先本层文件，再递归子目录 */
-  listText(dir: string, acc: string[] = [], depth = 0): string[] {
+  listText(dir: string, acc: string[] = [], depth = 0, cap = EDIT_SIZE_LIMIT): string[] {
     if (depth > 4 || acc.length >= 200) return acc;
     const d = normalize(dir);
     for (const p of this.children(d)) {
       if (acc.length >= 200) return acc;
       if (this.isDir(p) || baseName(p).startsWith(".")) continue;
       if (this.textFilter && !isTextCandidate(baseName(p))) continue;
+      if (new TextEncoder().encode(this.content(p) ?? "").length > cap) continue;
       acc.push(p);
     }
     for (const p of this.children(d)) {
-      if (this.isDir(p) && !baseName(p).startsWith(".")) this.listText(p, acc, depth + 1);
+      if (this.isDir(p) && !baseName(p).startsWith(".")) this.listText(p, acc, depth + 1, cap);
     }
     return acc;
   }
@@ -303,7 +308,7 @@ export interface TauriMock {
 
 export function installTauriMock(options: TauriMockOptions = {}): TauriMock {
   const fs = new VirtualFs(options.fs ?? {}, options.textFilter ?? true);
-  const largeFileLimit = options.largeFileLimit ?? EDIT_SIZE_LIMIT;
+  const largeFileLimit = options.largeFileLimit;
   const calls: Call[] = [];
   const recent: RecentEntry[] = (options.recent ?? []).map((p) => ({
     path: normalize(p),
@@ -357,13 +362,19 @@ export function installTauriMock(options: TauriMockOptions = {}): TauriMock {
           throw `系统找不到指定的文件。(os error 2): ${str("path")}`;
         }
         const size = new TextEncoder().encode(raw).length;
+        // 用例注入的小阈值优先，其次前端配置传来的档位，最后默认值
+        const editLimit = largeFileLimit ?? (typeof a.editLimitMb === "number" ? a.editLimitMb * 1024 * 1024 : EDIT_SIZE_LIMIT);
+        const maxLimit = options.maxFileLimit ?? (typeof a.maxFileMb === "number" ? a.maxFileMb * 1024 * 1024 : MAX_FILE_LIMIT);
+        if (size > maxLimit) {
+          throw `文件过大（${Math.floor(size / 1024 / 1024)} MB），当前上限为 ${Math.floor(maxLimit / 1024 / 1024)} MB`;
+        }
         // 与 Rust 一致：报告主流行尾，但交给编辑器的内容统一用 \n
         return {
           content: toLf(raw),
           encoding: "UTF-8",
           line_ending: detectLineEnding(raw),
           size,
-          large: size > largeFileLimit
+          large: size > editLimit
         };
       }
       case "write_text_file": {
@@ -391,7 +402,9 @@ export function installTauriMock(options: TauriMockOptions = {}): TauriMock {
       case "path_exists":
         return fs.exists(str("path"));
       case "list_text_files":
-        return fs.listText(str("dir"));
+        return fs.listText(str("dir"), [], 0, typeof a.editLimitMb === "number" ? a.editLimitMb * 1024 * 1024 : EDIT_SIZE_LIMIT);
+      case "refresh_size_menu":
+        return null;
       case "list_folder_tree":
         return fs.tree(str("dir"));
       case "create_file": {

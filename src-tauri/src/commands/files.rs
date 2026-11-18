@@ -5,10 +5,11 @@ use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 use tauri::AppHandle;
 
-const MAX_FILE_SIZE: u64 = 64 * 1024 * 1024;
+/// 拒绝打开的硬上限；前端可经配置下调/上调，命令参数缺省时用这里
+const MAX_FILE_SIZE: u64 = 256 * 1024 * 1024;
 /// 超过这个大小的文件按只读打开：编辑文档要维护撤销栈和增量结构，
 /// 内存会是原始文本的数倍，超大文件只做“看”不做“改”才能封顶占用。
-const EDIT_SIZE_LIMIT: u64 = 8 * 1024 * 1024;
+const EDIT_SIZE_LIMIT: u64 = 64 * 1024 * 1024;
 const MAX_RECENT: usize = 20;
 
 #[derive(Serialize)]
@@ -215,13 +216,19 @@ fn encoding_by_name(name: &str) -> &'static encoding_rs::Encoding {
 }
 
 #[tauri::command]
-pub fn read_text_file(path: String) -> Result<FileContent, String> {
+pub fn read_text_file(
+    path: String,
+    edit_limit_mb: Option<u64>,
+    max_file_mb: Option<u64>,
+) -> Result<FileContent, String> {
+    let edit_limit = edit_limit_mb.unwrap_or(EDIT_SIZE_LIMIT / 1024 / 1024) * 1024 * 1024;
+    let max_file = max_file_mb.unwrap_or(MAX_FILE_SIZE / 1024 / 1024) * 1024 * 1024;
     let meta = fs::metadata(&path).map_err(|e| e.to_string())?;
-    if meta.len() > MAX_FILE_SIZE {
+    if meta.len() > max_file {
         return Err(format!(
             "文件过大（{} MB），当前上限为 {} MB",
             meta.len() / 1024 / 1024,
-            MAX_FILE_SIZE / 1024 / 1024
+            max_file / 1024 / 1024
         ));
     }
     let bytes = fs::read(&path).map_err(|e| e.to_string())?;
@@ -245,7 +252,7 @@ pub fn read_text_file(path: String) -> Result<FileContent, String> {
         encoding: enc.name().to_owned(),
         line_ending,
         size,
-        large: size > EDIT_SIZE_LIMIT,
+        large: size > edit_limit,
     })
 }
 
@@ -339,7 +346,7 @@ const NO_EXT_NAMES: &[&str] = &[
 ];
 
 const MAX_FOLDER_FILES: usize = 200;
-const MAX_FOLDER_FILE_SIZE: u64 = 8 * 1024 * 1024;
+const MAX_FOLDER_FILE_SIZE: u64 = EDIT_SIZE_LIMIT;
 const MAX_FOLDER_DEPTH: u32 = 4;
 
 fn is_text_candidate(path: &Path) -> bool {
@@ -375,7 +382,7 @@ fn looks_like_text(path: &Path) -> bool {
     !buf[..read].contains(&0)
 }
 
-fn scan_dir(dir: &Path, depth: u32, out: &mut Vec<String>) {
+fn scan_dir(dir: &Path, depth: u32, cap: u64, out: &mut Vec<String>) {
     if depth > MAX_FOLDER_DEPTH || out.len() >= MAX_FOLDER_FILES {
         return;
     }
@@ -397,7 +404,7 @@ fn scan_dir(dir: &Path, depth: u32, out: &mut Vec<String>) {
             }
             subdirs.push(p);
         } else if p.is_file() && is_text_candidate(&p) {
-            if fs::metadata(&p).map(|m| m.len() <= MAX_FOLDER_FILE_SIZE).unwrap_or(false) {
+            if fs::metadata(&p).map(|m| m.len() <= cap).unwrap_or(false) {
                 files.push(p);
             }
         }
@@ -411,7 +418,7 @@ fn scan_dir(dir: &Path, depth: u32, out: &mut Vec<String>) {
         out.push(f.to_string_lossy().to_string());
     }
     for d in subdirs {
-        scan_dir(&d, depth + 1, out);
+        scan_dir(&d, depth + 1, cap, out);
     }
 }
 
@@ -421,9 +428,10 @@ pub fn is_directory(path: String) -> bool {
 }
 
 #[tauri::command]
-pub fn list_text_files(dir: String) -> Vec<String> {
+pub fn list_text_files(dir: String, edit_limit_mb: Option<u64>) -> Vec<String> {
+    let cap = edit_limit_mb.unwrap_or(MAX_FOLDER_FILE_SIZE / 1024 / 1024) * 1024 * 1024;
     let mut out = Vec::new();
-    scan_dir(Path::new(&dir), 0, &mut out);
+    scan_dir(Path::new(&dir), 0, cap, &mut out);
     out
 }
 
@@ -734,7 +742,7 @@ mod tests {
         let dir = tmp("utf8");
         let f = dir.join("a.txt");
         fs::write(&f, "hello 世界\nline2\n").unwrap();
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         assert_eq!(fc.encoding, "UTF-8");
         assert_eq!(fc.line_ending, "\n");
         assert!(fc.content.contains("世界"));
@@ -747,7 +755,7 @@ mod tests {
         let mut bytes = vec![0xEF, 0xBB, 0xBF];
         bytes.extend_from_slice("带BOM的文件\r\n第二行".as_bytes());
         fs::write(&f, &bytes).unwrap();
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         assert_eq!(fc.encoding, "UTF-8");
         // BOM 必须被剥掉，不能残留在内容开头
         assert!(!fc.content.starts_with('\u{FEFF}'));
@@ -763,7 +771,7 @@ mod tests {
         let dir = tmp("ascii");
         let f = dir.join("ascii.txt");
         fs::write(&f, b"plain ascii, no high bytes\r\n").unwrap();
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         assert_eq!(fc.encoding, "UTF-8");
         assert_eq!(fc.content, "plain ascii, no high bytes\n");
         assert_eq!(fc.line_ending, "\r\n");
@@ -776,7 +784,7 @@ mod tests {
         let mut bytes = vec![0xFF, 0xFE];
         bytes.extend(utf16le_bytes("UTF-16LE 测试\n第二行"));
         fs::write(&f, &bytes).unwrap();
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         assert_eq!(fc.encoding, "UTF-16LE");
         assert_eq!(fc.content, "UTF-16LE 测试\n第二行");
     }
@@ -788,7 +796,7 @@ mod tests {
         let mut bytes = vec![0xFE, 0xFF];
         bytes.extend(utf16be_bytes("UTF-16BE 测试\r\n第二行"));
         fs::write(&f, &bytes).unwrap();
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         assert_eq!(fc.encoding, "UTF-16BE");
         assert_eq!(fc.line_ending, "\r\n");
         assert_eq!(fc.content, "UTF-16BE 测试\n第二行");
@@ -801,7 +809,7 @@ mod tests {
         let f = dir.join("g.txt");
         let bytes = GB18030.encode("这是GBK编码。\r\n第二行").0;
         fs::write(&f, &bytes).unwrap();
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         assert_eq!(fc.encoding, "gb18030");
         assert_eq!(fc.line_ending, "\r\n");
         assert_eq!(fc.content, "这是GBK编码。\n第二行");
@@ -812,7 +820,7 @@ mod tests {
         let dir = tmp("u16");
         let f = dir.join("u.txt");
         fs::write(&f, "\u{FEFF}测试UTF16".encode_utf16().flat_map(|c| c.to_le_bytes()).collect::<Vec<u8>>()).unwrap();
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         assert_eq!(fc.encoding, "UTF-16LE");
         assert_eq!(fc.content, "测试UTF16");
         write_text_file(s(&f), fc.content + "\n", Some("UTF-16LE".into()), Some("\r\n".into())).unwrap();
@@ -831,7 +839,7 @@ mod tests {
         let f = dir.join("big5.txt");
         let bytes = BIG5.encode("中文繁體測試").0;
         fs::write(&f, &bytes).unwrap();
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         assert_eq!(fc.encoding, "Big5");
         assert_eq!(fc.content, "中文繁體測試");
     }
@@ -844,7 +852,7 @@ mod tests {
         let f = dir.join("sjis.txt");
         let bytes = SHIFT_JIS.encode("日本語テスト").0;
         fs::write(&f, &bytes).unwrap();
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         assert_eq!(fc.encoding, "Shift_JIS");
         assert_eq!(fc.content, "日本語テスト");
     }
@@ -856,7 +864,7 @@ mod tests {
         let f = dir.join("euckr.txt");
         let bytes = EUC_KR.encode("한국어 테스트").0;
         fs::write(&f, &bytes).unwrap();
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         assert_eq!(fc.encoding, "EUC-KR");
         assert_eq!(fc.content, "한국어 테스트");
     }
@@ -869,7 +877,7 @@ mod tests {
         let f = dir.join("gb.txt");
         let bytes = GB18030.encode("这是一段中文文本\n").0;
         fs::write(&f, &bytes).unwrap();
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         assert_eq!(fc.encoding, "gb18030");
         assert_eq!(fc.content, "这是一段中文文本\n");
     }
@@ -886,7 +894,7 @@ mod tests {
             let f = dir.join(name);
             let bytes = enc.encode(text).0;
             fs::write(&f, &bytes).unwrap();
-            let fc = read_text_file(s(&f)).unwrap();
+            let fc = read_text_file(s(&f), None, None).unwrap();
             assert_eq!(fc.content, text, "{}", fc.encoding);
             write_text_file(s(&f), text.into(), Some(fc.encoding.clone()), Some("\n".into())).unwrap();
             assert_eq!(fs::read(&f).unwrap(), bytes.to_vec(), "{}", fc.encoding);
@@ -927,7 +935,7 @@ mod tests {
         for (name, enc, text, want) in cases {
             let f = dir.join(name);
             fs::write(&f, enc.encode(text).0.as_ref()).unwrap();
-            let fc = read_text_file(s(&f)).unwrap();
+            let fc = read_text_file(s(&f), None, None).unwrap();
             assert_eq!(fc.encoding, want, "{name}");
             assert_eq!(fc.content, text, "{name}");
         }
@@ -940,7 +948,7 @@ mod tests {
         // 0xFF 使 GB18030/BIG5/SHIFT_JIS/EUC_KR 全部解码失败，回退 WINDOWS-1252；
         // WHATWG windows-1252 对每个字节都有映射，不会产生 U+FFFD。
         fs::write(&f, [0x41u8, 0xFF, 0x42, 0x81, 0xFE]).unwrap();
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         assert_eq!(fc.encoding, "windows-1252");
         assert_eq!(fc.content, "A\u{FF}B\u{81}\u{FE}");
         assert!(!fc.content.contains('\u{FFFD}'));
@@ -951,7 +959,7 @@ mod tests {
         let dir = tmp("emptyfile");
         let f = dir.join("empty.txt");
         fs::write(&f, "").unwrap();
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         assert_eq!(fc.content, "");
         assert_eq!(fc.encoding, "UTF-8");
         assert_eq!(fc.line_ending, "\n");
@@ -961,9 +969,9 @@ mod tests {
     #[test]
     fn read_missing_file_and_directory_return_err() {
         let dir = tmp("readerr");
-        assert!(read_text_file(s(&dir.join("nope.txt"))).is_err());
+        assert!(read_text_file(s(&dir.join("nope.txt")), None, None).is_err());
         // 对目录调用读取：metadata 能过但 fs::read 会报 Is a directory
-        assert!(read_text_file(s(&dir)).is_err());
+        assert!(read_text_file(s(&dir), None, None).is_err());
     }
 
     // ===================== B. 行尾检测与归一化 =====================
@@ -995,20 +1003,20 @@ mod tests {
         // 混合行尾：1 个 \r\n + 1 个裸 \n，平局按 LF 上报，但内容统一为 \n
         let f1 = dir.join("mix.txt");
         fs::write(&f1, "a\r\nb\nc").unwrap();
-        let fc = read_text_file(s(&f1)).unwrap();
+        let fc = read_text_file(s(&f1), None, None).unwrap();
         assert_eq!(fc.line_ending, "\n");
         assert_eq!(fc.content, "a\nb\nc");
         assert!(!fc.content.contains('\r'));
         // \r\r\n（旧 Mac 与 CRLF 粘连）：按实现计 1 个 CRLF，内容归一化为两个 \n
         let f2 = dir.join("cr.txt");
         fs::write(&f2, "abc\r\r\ndef").unwrap();
-        let fc = read_text_file(s(&f2)).unwrap();
+        let fc = read_text_file(s(&f2), None, None).unwrap();
         assert_eq!(fc.line_ending, "\r\n");
         assert_eq!(fc.content, "abc\n\ndef");
         // 纯 CR 文件：上报 CR，内容仍被归一化成 \n
         let f3 = dir.join("pure-cr.txt");
         fs::write(&f3, "x\ry\rz").unwrap();
-        let fc = read_text_file(s(&f3)).unwrap();
+        let fc = read_text_file(s(&f3), None, None).unwrap();
         assert_eq!(fc.line_ending, "\r");
         assert_eq!(fc.content, "x\ny\nz");
         assert!(!fc.content.contains('\r'));
@@ -1024,7 +1032,7 @@ mod tests {
         assert_eq!(fs::read(&f).unwrap(), b"x\r\ny\r\n");
         assert_eq!(meta.size, 6);
         assert!(meta.exists);
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         assert_eq!(fc.line_ending, "\r\n");
         assert_eq!(fc.content, "x\ny\n");
     }
@@ -1038,7 +1046,7 @@ mod tests {
         assert_eq!(fs::read(&f).unwrap(), b"x\r\ny\r\n");
         // 反复保存保持字节不变
         for _ in 0..3 {
-            let content = read_text_file(s(&f)).unwrap().content;
+            let content = read_text_file(s(&f), None, None).unwrap().content;
             write_text_file(s(&f), content, None, Some("\r\n".into())).unwrap();
             assert_eq!(fs::read(&f).unwrap(), b"x\r\ny\r\n");
         }
@@ -1046,7 +1054,7 @@ mod tests {
         let cr = dir.join("cr.txt");
         write_text_file(s(&cr), "x\ny\n".into(), None, Some("\r".into())).unwrap();
         assert_eq!(fs::read(&cr).unwrap(), b"x\ry\r");
-        let fc = read_text_file(s(&cr)).unwrap();
+        let fc = read_text_file(s(&cr), None, None).unwrap();
         assert_eq!(fc.line_ending, "\r");
         assert_eq!(fc.content, "x\ny\n");
     }
@@ -1059,7 +1067,7 @@ mod tests {
         let raw = fs::read(&le).unwrap();
         assert!(raw.starts_with(&[0xFF, 0xFE]));
         assert_eq!(from_utf16_le(&raw[2..]), "写入UTF16LE\n");
-        let fc = read_text_file(s(&le)).unwrap();
+        let fc = read_text_file(s(&le), None, None).unwrap();
         assert_eq!(fc.encoding, "UTF-16LE");
         assert_eq!(fc.content, "写入UTF16LE\n");
         assert_eq!(fc.size, raw.len() as u64);
@@ -1069,7 +1077,7 @@ mod tests {
         let raw = fs::read(&be).unwrap();
         assert!(raw.starts_with(&[0xFE, 0xFF]));
         // 编码名匹配忽略大小写（encoding_by_name 会先转大写）
-        let fc = read_text_file(s(&be)).unwrap();
+        let fc = read_text_file(s(&be), None, None).unwrap();
         assert_eq!(fc.encoding, "UTF-16BE");
         assert_eq!(fc.content, "写入UTF16BE");
     }
@@ -1083,7 +1091,7 @@ mod tests {
         let raw = fs::read(&f).unwrap();
         assert_eq!(raw, GB18030.encode("简体中文与标点：《句号》。\r\n第二行").0.as_ref());
         assert_eq!(meta.size, raw.len() as u64);
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         assert_eq!(fc.encoding, "gb18030");
         assert_eq!(fc.content, text);
     }
@@ -1115,7 +1123,7 @@ mod tests {
         assert_eq!(meta.size, 0);
         let raw = fs::read(&f).unwrap();
         assert!(raw.is_empty());
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         assert_eq!(fc.content, "");
     }
 
@@ -1239,8 +1247,8 @@ mod tests {
         fs::write(dir.join("Dockerfile"), "FROM x").unwrap();
         fs::write(dir.join("sub").join("c.md"), "# c").unwrap();
         fs::write(dir.join(".hidden").join("d.txt"), "ddd").unwrap();
-        fs::write(dir.join("huge.txt"), vec![b'x'; 9 * 1024 * 1024]).unwrap();
-        let found = list_text_files(s(&dir));
+        sparse_file(&dir.join("huge.txt"), MAX_FOLDER_FILE_SIZE + 1);
+        let found = list_text_files(s(&dir), None);
         let mut names: Vec<String> = found
             .iter()
             .map(|p| {
@@ -1283,7 +1291,7 @@ mod tests {
         fs::create_dir_all(dir.join(".git")).unwrap();
         fs::write(dir.join(".git").join("config"), "g").unwrap();
 
-        let found = list_text_files(s(&dir));
+        let found = list_text_files(s(&dir), None);
         let rel: Vec<String> = found
             .iter()
             .map(|p| {
@@ -1314,7 +1322,7 @@ mod tests {
         for i in 0..250 {
             fs::write(dir.join(format!("f{:03}.txt", i)), "x").unwrap();
         }
-        let found = list_text_files(s(&dir));
+        let found = list_text_files(s(&dir), None);
         assert_eq!(found.len(), MAX_FOLDER_FILES);
         assert_eq!(found.len(), 200);
         // 命中上限的是字典序前 200 个文件
@@ -1326,7 +1334,7 @@ mod tests {
     #[test]
     fn list_text_files_missing_dir_returns_empty() {
         let dir = tmp("listmissing");
-        assert!(list_text_files(s(&dir.join("nope"))).is_empty());
+        assert!(list_text_files(s(&dir.join("nope")), None).is_empty());
     }
 
     // ===================== H. list_folder_tree / build_tree =====================
@@ -1423,8 +1431,8 @@ mod tests {
         let root = list_folder_tree(s(&dir));
         let elapsed = start.elapsed();
         println!("list_folder_tree over 16MB + 300 files in {:?}", elapsed);
-        // 超过 8MB 的 big.md 不进树（建树不读取内容，但按大小过滤）
-        assert_eq!(child_names(&root), vec!["many"]);
+        // 16MB 在默认 64MB 收录档内，进树但不读内容；超过收录档才过滤
+        assert_eq!(child_names(&root), vec!["many", "big.md"]);
         assert_eq!(find_node(&root, "many").unwrap().children.as_ref().unwrap().len(), 300);
         // CI 共享 runner 实测可达本机 4–6 倍耗时，阈值取 4 倍余量
         assert!(elapsed.as_millis() < 12000, "16MB 目录树构建耗时 {elapsed:?}");
@@ -1574,25 +1582,25 @@ mod tests {
     #[test]
     fn rejects_oversized_file() {
         let dir = tmp("big");
-        // 用稀疏文件造一个刚好超过 64MB 上限的文件：APFS 上不占实际磁盘块
+        // 用稀疏文件造一个刚好超过 256MB 上限的文件：APFS 上不占实际磁盘块
         let f = dir.join("sparse.txt");
         sparse_file(&f, MAX_FILE_SIZE + 1);
-        let err = match read_text_file(s(&f)) {
-            Ok(_) => panic!("超过 64MB 的文件应被拒绝读取"),
+        let err = match read_text_file(s(&f), None, None) {
+            Ok(_) => panic!("超过 256MB 的文件应被拒绝读取"),
             Err(e) => e,
         };
         assert!(err.contains("文件过大"), "错误文案应包含「文件过大」，实际：{}", err);
-        assert!(err.contains("64 MB"), "错误文案应包含上限 MB 数，实际：{}", err);
+        assert!(err.contains("256 MB"), "错误文案应包含上限 MB 数，实际：{}", err);
         // 同目录下的正常小文件不受影响
         let small = dir.join("small.txt");
         fs::write(&small, "still fine").unwrap();
-        let fc = read_text_file(s(&small)).unwrap();
+        let fc = read_text_file(s(&small), None, None).unwrap();
         assert_eq!(fc.content, "still fine");
         // 恰好等于上限的文件按实现（> 才拒绝）应可读
         let edge = dir.join("edge.txt");
         sparse_file(&edge, MAX_FILE_SIZE);
-        // 64MB 全零稀疏文件读取较快，解码后是 64MB 的 NUL 文本；只验证不被拒绝
-        assert!(read_text_file(s(&edge)).is_ok());
+        // 256MB 全零稀疏文件只验证不被拒绝（解码与归一化仍要完整走一遍）
+        assert!(read_text_file(s(&edge), None, None).is_ok());
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -1630,7 +1638,7 @@ mod tests {
         }
         fs::write(&f, &data).unwrap();
         let start = std::time::Instant::now();
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         let elapsed = start.elapsed();
         println!("read 16MB in {:?}", elapsed);
         assert!(fc.content.len() > 16 * 1024 * 1024);
@@ -1648,7 +1656,7 @@ mod tests {
         assert!(bytes.len() > 16 * 1024 * 1024);
         fs::write(&f, &bytes).unwrap();
         let start = std::time::Instant::now();
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         let elapsed = start.elapsed();
         println!("read 16MB UTF-16LE in {:?}", elapsed);
         assert_eq!(fc.encoding, "UTF-16LE");
@@ -1726,7 +1734,7 @@ mod tests {
         bytes.extend_from_slice(&GB18030.encode(&body).0);
         let f = dir.join("head.log");
         fs::write(&f, &bytes).unwrap();
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         assert_eq!(fc.encoding, "gb18030");
         assert!(fc.content.starts_with("REM header line\n"));
         assert!(fc.content.ends_with(&body));
@@ -1747,7 +1755,7 @@ mod tests {
         bytes.extend_from_slice(&[0xF8, 0xFF, 0xFE]); // 窗口之外的非法字节
         let f = dir.join("tail.gbk");
         fs::write(&f, &bytes).unwrap();
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         assert_eq!(fc.encoding, "gb18030");
         assert!(!fc.content.contains('\u{FFFD}'), "非法字节应被剔除而不是留下替换字符");
         assert!(fc.content.starts_with("\u{4e2d}\u{534e}\u{6587}\u{5b57} "));
@@ -1797,7 +1805,7 @@ mod tests {
         let f = dir.join("big.gbk");
         fs::write(&f, &bytes).unwrap();
         let start = std::time::Instant::now();
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), None, None).unwrap();
         let elapsed = start.elapsed();
         println!("read 16MB GB18030 in {:?}", elapsed);
         assert_eq!(fc.encoding, "gb18030");
@@ -1810,17 +1818,17 @@ mod tests {
 
     #[test]
     fn oversized_rejection_does_not_read_the_file() {
-        // 拒绝路径只 stat：即便 64MB 也应在几十毫秒内返回错误
+        // 拒绝路径只 stat：即便 256MB 也应在几十毫秒内返回错误
         let dir = tmp("rejectperf");
         let f = dir.join("huge.bin");
         sparse_file(&f, MAX_FILE_SIZE + 1);
         let start = std::time::Instant::now();
-        let err = match read_text_file(s(&f)) {
-            Ok(_) => panic!("超过 64MB 的文件应被拒绝读取"),
+        let err = match read_text_file(s(&f), None, None) {
+            Ok(_) => panic!("超过 256MB 的文件应被拒绝读取"),
             Err(e) => e,
         };
         let elapsed = start.elapsed();
-        println!("reject 64MB+ in {:?} ({})", elapsed, err);
+        println!("reject 256MB+ in {:?} ({})", elapsed, err);
         assert!(err.contains("文件过大"));
         assert!(elapsed.as_millis() < 100, "拒绝超大文件不该读盘，耗时 {elapsed:?}");
         let _ = fs::remove_dir_all(&dir);
@@ -1832,26 +1840,34 @@ mod tests {
         // 恰好等于阈值仍可编辑，超过一个字节就只读
         let at = dir.join("at-limit.txt");
         sparse_file(&at, EDIT_SIZE_LIMIT);
-        let fc = read_text_file(s(&at)).unwrap();
+        let fc = read_text_file(s(&at), None, None).unwrap();
         assert_eq!(fc.size, EDIT_SIZE_LIMIT);
-        assert!(!fc.large, "恰好 8MB 不该标记为超大");
+        assert!(!fc.large, "恰好 64MB 不该标记为超大");
 
         let over = dir.join("over-limit.txt");
         sparse_file(&over, EDIT_SIZE_LIMIT + 1);
-        let fc = read_text_file(s(&over)).unwrap();
+        let fc = read_text_file(s(&over), None, None).unwrap();
         assert_eq!(fc.size, EDIT_SIZE_LIMIT + 1);
-        assert!(fc.large, "超过 8MB 应标记为超大并交给前端只读打开");
+        assert!(fc.large, "超过 64MB 应标记为超大并交给前端只读打开");
 
         // 阈值之下的普通文件
         let small = dir.join("small.txt");
         fs::write(&small, "\u{65e5}\u{5fd7}\u{5185}\u{5bb9}").unwrap();
-        assert!(!read_text_file(s(&small)).unwrap().large);
+        assert!(!read_text_file(s(&small), None, None).unwrap().large);
+
+        // 菜单调档走命令参数：9MB 在默认 64MB 档可编辑，压到 8MB 档只读，再压拒绝档直接报错
+        let nine = dir.join("nine.txt");
+        sparse_file(&nine, 9 * 1024 * 1024);
+        assert!(!read_text_file(s(&nine), None, None).unwrap().large);
+        assert!(read_text_file(s(&nine), Some(8), None).unwrap().large);
+        let err = read_text_file(s(&nine), None, Some(8)).err().unwrap();
+        assert!(err.contains("当前上限为 8 MB"), "{err}");
         let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
-    fn read_9mb_plain_text_is_flagged_large_but_complete() {
-        // 真实略超阈值的文本：既给出 large 标记，也保证内容完整可读
+    fn read_9mb_plain_text_over_custom_limit_is_flagged_large_but_complete() {
+        // 真实略超自定义阈值的文本：既给出 large 标记，也保证内容完整可读
         let dir = tmp("large9mb");
         let line = "2026-01-01 12:00:00 INFO worker thread handled request 0123456789\n";
         let mut data = String::new();
@@ -1861,7 +1877,7 @@ mod tests {
         let f = dir.join("app.log");
         fs::write(&f, &data).unwrap();
         let start = std::time::Instant::now();
-        let fc = read_text_file(s(&f)).unwrap();
+        let fc = read_text_file(s(&f), Some(8), None).unwrap();
         let elapsed = start.elapsed();
         println!("read 9MB log in {:?}", elapsed);
         assert!(fc.large);

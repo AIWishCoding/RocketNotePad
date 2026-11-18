@@ -17,6 +17,10 @@ export interface AppConfig {
   sidebarVisible: boolean;
   /** 全程记录启动日志；关闭时只在启动出问题时补写一份 */
   startupLog: boolean;
+  /** 可编辑上限（MB）：超过按只读打开 */
+  editLimitMB: number;
+  /** 拒绝打开的硬上限（MB） */
+  maxFileMB: number;
   /** 资源管理器里已挂载的文件夹 */
   folders: string[];
   /** 上次退出时打开的标签路径 */
@@ -35,6 +39,8 @@ const DEFAULTS: AppConfig = {
   minimap: true,
   sidebarVisible: true,
   startupLog: false,
+  editLimitMB: 64,
+  maxFileMB: 256,
   folders: [],
   restoreTabs: [],
   restoreActive: ""
@@ -52,6 +58,8 @@ const isFontSize = (v: unknown): v is number =>
   typeof v === "number" && Number.isFinite(v) && v >= 8 && v <= 72;
 const isFontFamily = (v: unknown): v is string =>
   typeof v === "string" && v.trim().length > 0 && v.length <= 80;
+const isLimitMB = (v: unknown): v is number =>
+  typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 4096;
 
 const VALIDATORS: Record<keyof AppConfig, (v: unknown) => boolean> = {
   theme: isTheme,
@@ -63,6 +71,8 @@ const VALIDATORS: Record<keyof AppConfig, (v: unknown) => boolean> = {
   minimap: isBool,
   sidebarVisible: isBool,
   startupLog: isBool,
+  editLimitMB: isLimitMB,
+  maxFileMB: isLimitMB,
   folders: isPathList,
   restoreTabs: isPathList,
   restoreActive: isStr

@@ -485,3 +485,38 @@ describe("关闭所有标签", () => {
     expect(tab("note.md")?.dirty).toBe(true);
   });
 });
+
+describe("文件大小档位", () => {
+  it("启动时把默认档位 64/256 同步给菜单", () => {
+    expect(mock.lastCall("refresh_size_menu")?.args).toEqual({ editLimitMb: 64, maxFileMb: 256 });
+  });
+
+  it("菜单调档写进配置文件并重建菜单", async () => {
+    await menu("limits.edit.8");
+    await until(() => mock.configJson()?.editLimitMB === 8);
+    expect(mock.lastCall("refresh_size_menu")?.args).toEqual({ editLimitMb: 8, maxFileMb: 256 });
+    expect(mock.messages.at(-1)?.title).toBe("文件大小档位");
+    expect(mock.messages.at(-1)?.message).toContain("≤8 MB 可编辑");
+  });
+
+  it("两档冲突时自动调整另一档，恢复默认后不留痕", async () => {
+    await menu("limits.edit.128");
+    await until(() => mock.configJson()?.editLimitMB === 128);
+    expect(mock.configJson()?.maxFileMB).toBe(256);
+    await menu("limits.max.64");
+    await until(() => mock.configJson()?.maxFileMB === 64);
+    expect(mock.configJson()?.editLimitMB).toBe(32);
+    await menu("limits.edit.64");
+    await until(() => mock.configJson()?.editLimitMB === 64);
+    await menu("limits.max.256");
+    await until(() => mock.configJson()?.maxFileMB === 256);
+    expect(mock.lastCall("refresh_size_menu")?.args).toEqual({ editLimitMb: 64, maxFileMb: 256 });
+  });
+
+  it("未知菜单 id 依旧不产生副作用", async () => {
+    const before = mock.messages.length;
+    await menu("limits.edit.abc");
+    await flush(20);
+    expect(mock.messages).toHaveLength(before);
+  });
+});

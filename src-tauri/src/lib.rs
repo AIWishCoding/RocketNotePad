@@ -47,6 +47,7 @@ pub fn run() -> Result<(), tauri::Error> {
             commands::config::write_app_config,
             commands::format::format_document,
             commands::format::formatter_status,
+            menu::refresh_size_menu,
             startup::log_startup,
             startup::mark_page_ready,
             startup::set_startup_log,

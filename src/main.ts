@@ -24,6 +24,7 @@ import {
   listTextFiles,
   listRecent,
   pushRecent,
+  refreshSizeMenu,
   type RecentEntry
 } from "./api";
 import { Sidebar } from "./sidebar";
@@ -393,7 +394,7 @@ async function openFileDirect(
     return true;
   }
   try {
-    const fc = await readTextFile(path);
+    const fc = await readTextFile(path, settings.editLimitMB, settings.maxFileMB);
     const name = path.split(/[\\/]/).pop()!;
     const language = await loadLanguageSafe(languageForFile(name));
     const tab = makeTab(
@@ -449,7 +450,7 @@ async function openFileDirect(
 
 async function openFolder(dir: string): Promise<boolean> {
   await sidebar.addFolder(dir);
-  const files = await listTextFiles(dir);
+  const files = await listTextFiles(dir, settings.editLimitMB);
   if (files.length === 0) {
     await message(
       "该文件夹中没有找到可打开的文本文件。\n仅打开常见文本/代码类型（深度≤4、≤200 个、单个≤8MB）。",
@@ -894,7 +895,35 @@ function handleMenu(id: string) {
     case "help.about":
       showAbout();
       break;
+    default:
+      if (id.startsWith("limits.edit.") || id.startsWith("limits.max.")) applySizeLimits(id);
+      break;
   }
+}
+
+/** 菜单调档：落配置并重建菜单；两档冲突时自动抬高/压低另一档，保证可编辑 < 拒绝 */
+function applySizeLimits(id: string) {
+  const v = Number(id.split(".").pop());
+  if (!Number.isInteger(v) || v <= 0) return;
+  if (id.startsWith("limits.edit.")) {
+    settings.editLimitMB = v;
+    if (settings.maxFileMB <= v) settings.maxFileMB = v * 2;
+  } else {
+    settings.maxFileMB = v;
+    if (settings.editLimitMB >= v) settings.editLimitMB = Math.max(1, Math.floor(v / 2));
+  }
+  // 已打开标签的只读态跟着新档位走：readOnly 存在标签上，切标签/重配时生效
+  for (const t of tabs) {
+    if (t.path) t.readOnly = t.size > settings.editLimitMB * 1024 * 1024;
+  }
+  reconfigure(view, currentOpts());
+  renderStatus();
+  saveConfig();
+  void refreshSizeMenu(settings.editLimitMB, settings.maxFileMB);
+  void message(
+    `当前档位：≤${settings.editLimitMB} MB 可编辑，${settings.editLimitMB}–${settings.maxFileMB} MB 只读，>${settings.maxFileMB} MB 拒绝打开。`,
+    { title: "文件大小档位", kind: "info" }
+  );
 }
 
 async function renderRecentMenu() {
@@ -1072,6 +1101,7 @@ async function main() {
   note("脚本开始执行");
   await loadConfig();
   note("配置已读取");
+  void refreshSizeMenu(settings.editLimitMB, settings.maxFileMB);
   buildDOM();
   document.body.dataset.theme = settings.theme;
   applyEditorFont();

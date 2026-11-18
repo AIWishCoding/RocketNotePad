@@ -1,4 +1,4 @@
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Wry};
 
 fn item(app: &AppHandle, id: &str, label: &str, accel: Option<&str>) -> tauri::Result<MenuItem<Wry>> {
@@ -32,6 +32,42 @@ const FIND_PREV_ACCEL: &str = "Shift+CmdOrCtrl+G";
 const FIND_PREV_ACCEL: &str = "Shift+F3";
 
 pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
+    build_with_limits(app, DEFAULT_EDIT_LIMIT_MB, DEFAULT_MAX_FILE_MB)
+}
+
+/// 文件大小三档的菜单默认值；前端配置缺省时与后端常量保持一致
+pub const DEFAULT_EDIT_LIMIT_MB: u64 = 64;
+pub const DEFAULT_MAX_FILE_MB: u64 = 256;
+const EDIT_OPTIONS: [u64; 5] = [8, 16, 32, 64, 128];
+const MAX_OPTIONS: [u64; 5] = [64, 128, 256, 512, 1024];
+
+/// 调档后重建整棵菜单：勾当前值、禁用会让「可编辑 ≥ 拒绝」的非法组合
+pub fn build_with_limits(app: &AppHandle, edit_mb: u64, max_mb: u64) -> tauri::Result<Menu<Wry>> {
+    let mut edit_items: Vec<CheckMenuItem<Wry>> = Vec::new();
+    for v in EDIT_OPTIONS {
+        let it = CheckMenuItem::with_id(app, format!("limits.edit.{v}"), format!("{v} MB"), v < max_mb, v == edit_mb, None::<&str>)?;
+        edit_items.push(it);
+    }
+    let mut max_items: Vec<CheckMenuItem<Wry>> = Vec::new();
+    for v in MAX_OPTIONS {
+        let it = CheckMenuItem::with_id(app, format!("limits.max.{v}"), format!("{v} MB"), v > edit_mb, v == max_mb, None::<&str>)?;
+        max_items.push(it);
+    }
+    let edit_refs: Vec<&dyn IsMenuItem<Wry>> = edit_items.iter().map(|i| i as &dyn IsMenuItem<Wry>).collect();
+    let max_refs: Vec<&dyn IsMenuItem<Wry>> = max_items.iter().map(|i| i as &dyn IsMenuItem<Wry>).collect();
+    let edit_sub = Submenu::with_items(
+        app,
+        &format!("可编辑上限（当前 {edit_mb} MB）"),
+        true,
+        &edit_refs,
+    )?;
+    let max_sub = Submenu::with_items(
+        app,
+        &format!("只读上限 / 拒绝阈值（当前 {max_mb} MB）"),
+        true,
+        &max_refs,
+    )?;
+
     let file = Submenu::with_items(
         app,
         "文件",
@@ -46,6 +82,10 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &PredefinedMenuItem::separator(app)?,
             &item(app, "file.close_tab", "关闭标签", Some("CmdOrCtrl+W"))?,
             &item(app, "file.close_all", "关闭所有标签", Some("Shift+CmdOrCtrl+W"))?,
+            &PredefinedMenuItem::separator(app)?,
+            &edit_sub,
+            &max_sub,
+            &PredefinedMenuItem::separator(app)?,
             &item(app, "app.quit", "退出 RocketNotePad", Some("CmdOrCtrl+Q"))?,
         ],
     )?;
@@ -132,6 +172,14 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         app,
         &[&file, &edit, &find, &selection, &view, &goto, &help],
     )
+}
+
+/// 前端改完档位配置后调用：按新值重建菜单（勾选与禁用状态跟着变）
+#[tauri::command]
+pub fn refresh_size_menu(app: AppHandle, edit_limit_mb: u64, max_file_mb: u64) -> Result<(), String> {
+    let menu = build_with_limits(&app, edit_limit_mb, max_file_mb).map_err(|e| e.to_string())?;
+    app.set_menu(menu).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[cfg(test)]

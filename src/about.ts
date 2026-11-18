@@ -99,7 +99,7 @@ function featureGroups(): Array<{ title: string; tone: string; items: Feature[] 
         { icon: "folder", title: "文件夹式工作流", desc: "资源管理器可同时挂载多个文件夹，树内新建、重命名、复制粘贴、拖拽移动，右键菜单全中文。" },
         { icon: "trash", title: "删除进回收站", desc: "删除走系统回收站，误删可以还原；关闭标签与退出前统一询问未保存的修改。" },
         { icon: "encoding", title: "编码与换行", desc: "自动嗅探 UTF-8 / UTF-16 / GB18030 / Big5 / Shift_JIS / EUC-KR，保存时保持原编码与 CRLF、LF、CR。" },
-        { icon: "shield", title: "大文件保护", desc: "超过 8 MB 的文件按只读打开并封顶内存，状态栏标出「只读」，不会把整篇塞进可编辑缓冲区。" }
+        { icon: "shield", title: "大文件保护", desc: "默认 ≤64 MB 可编辑、64–256 MB 只读、>256 MB 拒绝；三档可在文件菜单调节并写入配置。只读档封顶内存，状态栏标出「只读」。" }
       ]
     },
     {
@@ -190,7 +190,8 @@ const TRADEOFFS: Array<[string, string]> = [
 
 const DELIVERY: Array<[string, string]> = [
   ["macOS", ".app 与 .dmg，应用自己的文件收在用户主目录的 ~/.rocketnote，不往 .app 包里写东西。"],
-  ["Windows", "x64 绿色 exe 与 NSIS 安装包，配置优先写 exe 同目录（拷走即带走设置），装进 Program Files 这类只读位置时自动退回 %APPDATA%。"]
+  ["Windows", "x64 绿色 exe 与 NSIS 安装包，配置优先写 exe 同目录（拷走即带走设置），装进 Program Files 这类只读位置时自动退回 %APPDATA%。"],
+  ["Linux", "x86_64 的 deb 与 AppImage（Ubuntu 22.04+，依赖 WebKitGTK 4.1），配置收在 ~/.rocketnote。"]
 ];
 
 function keyGroups(): Array<{ title: string; rows: Array<[string, string]> }> {
