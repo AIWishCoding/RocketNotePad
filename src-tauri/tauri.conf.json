@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "RocketNotePad",
+  "version": "0.2.2",
+  "identifier": "com.maple.rocketnotepad",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "title": "RocketNotePad",
+        "width": 1100,
+        "height": 750,
+        "minWidth": 640,
+        "minHeight": 420,
+        "resizable": true,
+        "dragDropEnabled": false,
+        "titleBarStyle": "Visible",
+        "additionalBrowserArgs": "--disable-background-networking --disable-component-update --disable-sync --disable-default-apps --disable-domain-reliability --disable-client-side-phishing-detection --no-default-browser-check --disable-search-engine-choice-screen --disable-breakpad"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "signingIdentity": "-"
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper",
+        "silent": true
+      }
+    }
+  }
+}

@@ -1,0 +1,39 @@
+[package]
+name = "rocketnotepad"
+version = "0.2.2"
+description = "A fast, lightweight local note pad - Notepad++ style"
+authors = ["maple"]
+default-run = "rocketnotepad"
+edition = "2021"
+rust-version = "1.82"
+
+[lib]
+name = "rocketnotepad_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-clipboard-manager = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+encoding_rs = "0.8"
+dirs = "6"
+trash = "5"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_System_Registry",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
+panic = "abort"

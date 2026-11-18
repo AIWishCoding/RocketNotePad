@@ -1,0 +1,15 @@
+[package]
+name = "rnp-probe"
+version = "1.0.0"
+description = "RocketNotePad 启动探针：零依赖，只用来判断客户机的运行环境能不能跑起来"
+edition = "2021"
+
+# 刻意不依赖 tauri/wry/webview2，也不跟主程序共用 target 目录：
+# 主程序 Cargo.toml 里多一个 [[bin]] 就会被 tauri bundler 一起塞进 .app。
+# panic=abort 还有一层用处：unwind 版本会导入 VCRUNTIME140.dll，
+# 而探针正是要在「什么都能没有」的机器上跑，少一个依赖少一种失败方式。
+[profile.release]
+opt-level = "s"
+codegen-units = 1
+strip = true
+panic = "abort"

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+probe/target/
+release-win/
+vibe_images/
+.DS_Store
+*.log
