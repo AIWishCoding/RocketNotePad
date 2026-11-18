@@ -38,7 +38,7 @@
 
 | 平台 | 要求 |
 |------|------|
-| macOS | Apple Silicon（aarch64 包；CI 提供 universal 包） |
+| macOS | Apple Silicon 或 Intel（分别提供 aarch64 / x64 安装包；CI 另出 universal 包） |
 | Windows | Windows 10 1803 及以上 / Windows 11 / Windows Server 2019+（x64），需 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)（较新系统已内置，安装包会自动引导下载） |
 
 ## 下载安装
@@ -46,6 +46,7 @@
 到 [Releases](https://github.com/AIWishCoding/RocketNotePad/releases) 页面下载：
 
 - `RocketNotePad_x.x.x_aarch64.dmg` — macOS（Apple Silicon）
+- `RocketNotePad_x.x.x_x64.dmg` — macOS（Intel 芯片）
 - `RocketNotePad_x.x.x_x64-setup.exe` — Windows 安装程序
 
 > 本应用未做 Apple 公证。若首次打开被 macOS 拦截提示「文件已损坏」，在终端执行：
@@ -74,6 +75,9 @@ npm run tauri dev
 ```bash
 # macOS（.app 与 .dmg，位于 src-tauri/target/release/bundle/）
 npm run tauri build
+
+# macOS Intel 包（x64 dmg）
+npm run tauri build -- --target x86_64-apple-darwin --bundles dmg
 
 # macOS universal 包
 npm run tauri build -- --target universal-apple-darwin
@@ -126,7 +130,7 @@ CI 由 GitHub Actions 承担：`push` 到 master 与 PR 跑全量测试（test.y
 
 ## 版本
 
-当前版本 **0.2.2**。版本号同步维护于 `package.json`、`src-tauri/Cargo.toml` 与 `src-tauri/tauri.conf.json`，由测试保证三处一致。
+当前版本 **0.2.3**。版本号同步维护于 `package.json`、`src-tauri/Cargo.toml` 与 `src-tauri/tauri.conf.json`，由测试保证三处一致。
 
 ## 许可
 
