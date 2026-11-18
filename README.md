@@ -34,6 +34,22 @@
 - 会话恢复：重开自动恢复上次挂载的文件夹、打开的标签与光标位置
 - Sublime 风格原生菜单栏 + `Cmd+P` 跳转任意文件、`Cmd+Shift+P` 命令面板
 
+## 界面预览
+
+**Markdown 编辑 + 实时预览**（GFM 表格、mermaid 甘特图同步渲染）：
+
+![Markdown 编辑与实时预览](docs/screenshots/editor-markdown.png)
+
+**SQL 语法高亮**（51 种语言按需加载）：
+
+![SQL 语法高亮](docs/screenshots/editor-sql.png)
+
+**关于面板 · 功能总览**：
+
+![关于面板功能页上半](docs/screenshots/about-features-top.png)
+
+![关于面板功能页下半](docs/screenshots/about-features-bottom.png)
+
 ## 系统要求
 
 | 平台 | 要求 |
@@ -113,6 +129,7 @@ CI 由 GitHub Actions 承担：`push` 到 master 与 PR 跑全量测试（test.y
 ├── src-tauri/            后端（Rust）
 │   └── src/              文件层：读写、编码嗅探、大文件保护、格式化、启动日志
 ├── probe/                零依赖启动探针（独立 crate，用于排查环境问题）
+├── docs/screenshots/     README 界面预览截图
 ├── tests/
 │   ├── unit/             前端单元测试
 │   └── e2e/              应用级端到端测试（jsdom 内模拟 Tauri 宿主）
