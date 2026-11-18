@@ -12,8 +12,8 @@ export function flush(ms = 0): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** 轮询等待条件成立，用于等待 main() 里的异步启动流程 */
-export async function until(condition: () => boolean, timeout = 3000, step = 10): Promise<void> {
+/** 轮询等待条件成立，用于等待 main() 里的异步启动流程；CI 慢机上 3 秒不够，取 10 秒 */
+export async function until(condition: () => boolean, timeout = 10000, step = 10): Promise<void> {
   const start = Date.now();
   while (!condition()) {
     if (Date.now() - start > timeout) throw new Error("等待超时: 页面状态未达到预期");
