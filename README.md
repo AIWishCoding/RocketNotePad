@@ -148,7 +148,7 @@ CI 由 GitHub Actions 承担：`push` 到 master 与 PR 跑全量测试（test.y
 
 ## 版本
 
-当前版本 **0.2.3**。版本号同步维护于 `package.json`、`src-tauri/Cargo.toml` 与 `src-tauri/tauri.conf.json`，由测试保证三处一致。
+当前版本 **0.2.4**。版本号同步维护于 `package.json`、`src-tauri/Cargo.toml` 与 `src-tauri/tauri.conf.json`，由测试保证三处一致。
 
 ## 许可
 
