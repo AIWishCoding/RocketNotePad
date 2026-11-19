@@ -1,7 +1,7 @@
 # RocketNotePad
 
 低资源占用的本地笔记 / 代码编辑器，交互类似VSCode。
-技术栈：**Rust + Tauri 2 + CodeMirror 6**（TypeScript / Vite），原生支持 **macOS** 与 **Windows**。
+技术栈：**Rust + Tauri 2 + CodeMirror 6**（TypeScript / Vite），原生支持 **macOS**（Apple Silicon / Intel）、**Windows 10+** 与 **Ubuntu 22.04+（x86_64，deb / AppImage）**。
 
 不登录、不联网、不上传：所有文件操作都发生在本机磁盘上。
 
@@ -66,7 +66,7 @@
 - `RocketNotePad_x.x.x_x64.dmg` — macOS（Intel 芯片）
 - `RocketNotePad_x.x.x_universal.dmg` — macOS 通用包（两种芯片皆可，不确定芯片时选它）
 - `RocketNotePad_x.x.x_x64-setup.exe` — Windows 安装程序
-- `rocketnotepad_x.x.x_amd64.deb` — Ubuntu / Debian（x86_64）
+- `RocketNotePad_x.x.x_amd64.deb` — Ubuntu / Debian（x86_64）
 - `RocketNotePad_x.x.x_amd64.AppImage` — Linux 通用免安装（x86_64）
 
 > 本应用未做 Apple 公证。若首次打开被 macOS 拦截提示「文件已损坏」，在终端执行：
