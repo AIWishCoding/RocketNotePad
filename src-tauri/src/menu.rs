@@ -83,9 +83,6 @@ pub fn build_with_limits(app: &AppHandle, edit_mb: u64, max_mb: u64) -> tauri::R
             &item(app, "file.close_tab", "关闭标签", Some("CmdOrCtrl+W"))?,
             &item(app, "file.close_all", "关闭所有标签", Some("Shift+CmdOrCtrl+W"))?,
             &PredefinedMenuItem::separator(app)?,
-            &edit_sub,
-            &max_sub,
-            &PredefinedMenuItem::separator(app)?,
             &item(app, "app.quit", "退出 RocketNotePad", Some("CmdOrCtrl+Q"))?,
         ],
     )?;
@@ -139,12 +136,6 @@ pub fn build_with_limits(app: &AppHandle, edit_mb: u64, max_mb: u64) -> tauri::R
             &item(app, "view.palette", "命令面板…", Some("Shift+CmdOrCtrl+P"))?,
             &item(app, "view.goto", "跳转任意处…", Some("CmdOrCtrl+P"))?,
             &PredefinedMenuItem::separator(app)?,
-            &item(app, "view.wrap", "切换自动换行", None)?,
-            &item(app, "view.theme", "切换明暗主题", None)?,
-            &item(app, "view.font", "字体…", None)?,
-            &item(app, "view.minimap", "切换 Minimap", None)?,
-            &item(app, "view.preview", "切换 Markdown 预览", None)?,
-            &PredefinedMenuItem::separator(app)?,
             &item(app, "view.zoom_in", "放大", Some("CmdOrCtrl+="))?,
             &item(app, "view.zoom_out", "缩小", Some("CmdOrCtrl+-"))?,
             &item(app, "view.zoom_reset", "重置缩放", Some("CmdOrCtrl+0"))?,
@@ -161,6 +152,22 @@ pub fn build_with_limits(app: &AppHandle, edit_mb: u64, max_mb: u64) -> tauri::R
         ],
     )?;
 
+    let settings = Submenu::with_items(
+        app,
+        "设置",
+        true,
+        &[
+            &edit_sub,
+            &max_sub,
+            &PredefinedMenuItem::separator(app)?,
+            &item(app, "view.wrap", "切换自动换行", None)?,
+            &item(app, "view.theme", "切换明暗主题", None)?,
+            &item(app, "view.font", "字体…", None)?,
+            &item(app, "view.minimap", "切换 Minimap", None)?,
+            &item(app, "view.preview", "切换 Markdown 预览", None)?,
+        ],
+    )?;
+
     let help = Submenu::with_items(
         app,
         "帮助",
@@ -170,7 +177,7 @@ pub fn build_with_limits(app: &AppHandle, edit_mb: u64, max_mb: u64) -> tauri::R
 
     Menu::with_items(
         app,
-        &[&file, &edit, &find, &selection, &view, &goto, &help],
+        &[&file, &edit, &find, &selection, &view, &goto, &settings, &help],
     )
 }
 

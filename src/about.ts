@@ -99,7 +99,7 @@ function featureGroups(): Array<{ title: string; tone: string; items: Feature[] 
         { icon: "folder", title: "文件夹式工作流", desc: "资源管理器可同时挂载多个文件夹，树内新建、重命名、复制粘贴、拖拽移动，右键菜单全中文。" },
         { icon: "trash", title: "删除进回收站", desc: "删除走系统回收站，误删可以还原；关闭标签与退出前统一询问未保存的修改。" },
         { icon: "encoding", title: "编码与换行", desc: "自动嗅探 UTF-8 / UTF-16 / GB18030 / Big5 / Shift_JIS / EUC-KR，保存时保持原编码与 CRLF、LF、CR。" },
-        { icon: "shield", title: "大文件保护", desc: "默认 ≤64 MB 可编辑、64–256 MB 只读、>256 MB 拒绝；三档可在文件菜单调节并写入配置。只读档封顶内存，状态栏标出「只读」。" }
+        { icon: "shield", title: "大文件保护", desc: "默认 ≤64 MB 可编辑、64–256 MB 只读、>256 MB 拒绝；三档可在设置菜单调节并写入配置。只读档封顶内存，状态栏标出「只读」。" }
       ]
     },
     {
