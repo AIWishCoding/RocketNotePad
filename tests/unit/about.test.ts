@@ -58,7 +58,7 @@ describe("版本号", () => {
   it("前端与打包配置同版本，Rust crate 那份由后端测试守住", () => {
     expect(APP_VERSION).toBe(pkg.version);
     expect(conf.version).toBe(pkg.version);
-    expect(pkg.version).toBe("0.2.5");
+    expect(pkg.version).toBe("0.2.6");
   });
 });
 
