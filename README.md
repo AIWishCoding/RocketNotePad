@@ -158,7 +158,7 @@ CI 由 GitHub Actions 承担：`push` 到 master 与 PR 跑全量测试（test.y
 
 ## 许可
 
-本项目基于 [Apache License 2.0](LICENSE) 开源发布，Copyright 2026 maple。
+本项目基于 [Apache License 2.0](LICENSE) 开源发布，Copyright 2026 AIWishCoding。
 
 ## 关注公众号
 
