@@ -51,6 +51,9 @@ function loadMermaid(theme: MermaidTheme): Promise<MermaidApi> {
         startOnLoad: false,
         securityLevel: "strict",
         theme,
+        // 预览层还要过一遍 DOMPurify：它会把 foreignObject 里的 HTML 标签整段剥掉，
+        // 图表只剩空框。关掉 HTML 标签让 Mermaid 直接输出 <text>，文本能安全通过清洗。
+        htmlLabels: false,
         fontFamily: getComputedStyle(document.body).fontFamily
       });
       mermaidTheme = theme;

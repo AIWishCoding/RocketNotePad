@@ -134,6 +134,21 @@ describe("mermaid 图表", () => {
     expect(mark?.querySelector("svg")).toBeTruthy();
     expect(mark?.classList.contains("failed")).toBe(false);
     expect(mermaid.initialize).toHaveBeenCalled();
+    // DOMPurify 会剥掉 foreignObject 内的 HTML：必须让 Mermaid 输出 <text> 标签
+    expect(vi.mocked(mermaid.initialize)).toHaveBeenCalledWith(
+      expect.objectContaining({ htmlLabels: false })
+    );
+  });
+
+  it("清洗后 <text> 节点标签保留，foreignObject 输出会被剥掉", async () => {
+    vi.mocked(mermaid.render).mockResolvedValueOnce({
+      svg: '<svg><g><text class="nodeLabel">订单服务</text><foreignObject><div>被剥掉的标签</div></foreignObject></g></svg>'
+    } as never);
+    const { pane } = await render("```mermaid\ngraph TD;A-->B;\n```\n");
+    await new Promise((r) => setTimeout(r, 20));
+    const mark = pane.querySelector<HTMLElement>("[data-mmd-id]");
+    expect(mark?.textContent).toContain("订单服务");
+    expect(mark?.textContent).not.toContain("被剥掉的标签");
   });
 
   it("语法错误时保留源码并给出中文提示", async () => {
