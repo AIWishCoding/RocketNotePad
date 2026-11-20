@@ -125,11 +125,11 @@ cargo test --lib detection_scans -- --nocapture  # 编码嗅探只扫前缀的�
 | --- | --- | --- | --- |
 | 编码嗅探代价与文件大小无关 | legacy 编码（GB18030/BIG5/Shift_JIS/EUC-KR）只解码第一个高位字节起算的 64 KiB 窗口，用流式解码器（半个字符会被缓冲，不误判为坏字节），整篇只做一次 UTF-8 校验 | 16 MB GB18030 嗅探 26 ms（旧实现要对整篇做四次解码） | `detection_scans_only_a_window_not_the_whole_file` |
 | 读取路径少复制 | 解码后立即 `drop` 原始字节，BOM 用 `drain`、坏字节用 `retain` 原地处理，行尾归一化单遍完成（无 `\r` 时直接跳过，不分配等大副本） | 16 MB UTF-8 55 ms、16 MB UTF-16LE 144 ms、16 MB GB18030 676 ms、9 MB 日志 28 ms | `read_16mb_*`、`read_9mb_plain_text_is_flagged_large_but_complete`、`normalize_newlines_*` |
-| 超大文件只读打开 | 超过 8 MB（`EDIT_SIZE_LIMIT`）后端返回 `large: true`，前端不装撤销栈、`EditorState.readOnly` + `transactionFilter` 丢弃一切改动事务，查找替换的替换入口同时禁用 | 超过 64 MB 直接拒绝读取，只 stat 不读盘（4 µs） | `only_marks_files_over_the_edit_limit_as_large`、`oversized_rejection_does_not_read_the_file`、`tests/e2e/app-largefile.test.ts` |
+| 超大文件只读打开 | 超过 64 MB（`EDIT_SIZE_LIMIT`，默认档，可在「设置」菜单调）后端返回 `large: true`，前端不装撤销栈、`EditorState.readOnly` + `transactionFilter` 丢弃一切改动事务，查找替换的替换入口同时禁用 | 超过 256 MB（`MAX_FILE_SIZE`，同样可调）直接拒绝读取，只 stat 不读盘（4 µs） | `only_marks_files_over_the_edit_limit_as_large`、`oversized_rejection_does_not_read_the_file`、`tests/e2e/app-largefile.test.ts` |
 | 小地图重绘与行数解耦 | 按像素行采样（最多 1500 行），绘制代价只跟画布高度相关 | 6 万行与 5 千行的单次绘制代价相同 | `tests/unit/minimap.test.ts` 的「重绘代价与文档行数无关」 |
 | 拖选/输入不再强制同步布局 | 更新回调里只写缓存过的状态栏文本，读几何量（`scrollHeight`/`clientHeight`）的小地图指示器与预览滚动同步挪到 `requestAnimationFrame`（`src/frame.ts` 的 `perFrame`），一帧最多读一次、位置没变就不写样式；预览没打开时不拼整篇文档字符串，`setActive` 对同一份文档幂等 | 2500 行文档 + 小地图开启，真实浏览器里逐帧拖选 90 帧：中位 16.7 ms、p95 18.7 ms、最大 21 ms，超 32 ms 的帧 0 个、long task 0 个；逐帧输入 90 帧：中位 16.6 ms、p95 17.7 ms、超 32 ms 的帧 0 个 | `tests/unit/frame.test.ts`（200 次选区更新同步读几何量为 0、每帧读取次数固定）、`tests/e2e/app-smoothness.test.ts`（未变字段零重写、预览隐藏时零渲染） |
 
-尚未实现的是分块/惰性加载：8 MB 以上的文件仍要一次性读进内存并整篇交给 CodeMirror，只是从此不可编辑，避免撤销栈和增量结构把占用放大数倍。
+尚未实现的是分块/惰性加载：达到只读阈值（默认 64 MB）的文件仍要一次性读进内存并整篇交给 CodeMirror，只是从此不可编辑，避免撤销栈和增量结构把占用放大数倍。
 
 在浏览器 harness（`npm run dev` + 注入 mock）里用同一个 10 MB / 16 万行文档对照实测：
 
@@ -140,7 +140,7 @@ cargo test --lib detection_scans -- --nocapture  # 编码嗅探只扫前缀的�
 
 应用本体（.app）空闲态实测 CPU 0.0%，主进程 + WKWebView 四个辅助进程合计约 90–180 MB，随恢复的标签数量浮动。
 
-前端大文件阈值可用 `installTauriMock({ largeFileLimit })` 压低，无需真造 8 MB 文本就能在 jsdom 里跑只读路径。
+前端大文件阈值可用 `installTauriMock({ largeFileLimit })` 压低，无需真造 64 MB 文本就能在 jsdom 里跑只读路径。
 
 ### 3.3 持续集成
 
@@ -264,7 +264,7 @@ Linux 9 款（DejaVu、Liberation、Noto CJK…），等宽项标「等宽」标
 替代原先的三行原生消息框。四个分页：
 
 - **功能**：按「编辑与标签 / 文件与文件夹 / 阅读与导航 / 外观与会话」四组共 16 张卡片介绍整体能力，
-  文案里的数字（1.5 s 自动保存、8 MB 只读阈值、语言种数、9–40 px 字号）都取自真实实现，不写死。
+  文案里的数字（1.5 s 自动保存、64 MB 只读阈值、语言种数、9–40 px 字号）都取自真实实现，不写死。
 - **架构**：前端 TypeScript / 桥 Tauri 2 IPC / 后端 Rust 三层堆叠图，列出各层真实模块名与职责，
   附「关键取舍」与 macOS / Windows 交付形态。
 - **运行环境**：版本、平台、配置路径、可执行文件路径等**由后端 `app_info` 命令实时给出**，
