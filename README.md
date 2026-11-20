@@ -159,3 +159,9 @@ CI 由 GitHub Actions 承担：`push` 到 master 与 PR 跑全量测试（test.y
 ## 许可
 
 本项目基于 [Apache License 2.0](LICENSE) 开源发布，Copyright 2026 maple。
+
+## 关注公众号
+
+欢迎关注微信公众号，获取版本更新与新功能动态：
+
+<img src="docs/wechat-qrcode.jpg" alt="微信公众号二维码" width="240" />
