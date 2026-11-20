@@ -112,19 +112,14 @@ pub fn build_with_limits(app: &AppHandle, edit_mb: u64, max_mb: u64) -> tauri::R
             &item(app, "find.replace", "替换…", Some("CmdOrCtrl+Alt+E"))?,
             &item(app, "find.next", "查找下一个", Some(FIND_NEXT_ACCEL))?,
             &item(app, "find.prev", "查找上一个", Some(FIND_PREV_ACCEL))?,
+            &PredefinedMenuItem::separator(app)?,
+            &item(
+                app,
+                "select.next_occurrence",
+                "选中下一个相同项",
+                Some("CmdOrCtrl+D"),
+            )?,
         ],
-    )?;
-
-    let selection = Submenu::with_items(
-        app,
-        "选择",
-        true,
-        &[&item(
-            app,
-            "select.next_occurrence",
-            "选中下一个相同项",
-            Some("CmdOrCtrl+D"),
-        )?],
     )?;
 
     let view = Submenu::with_items(
@@ -177,7 +172,7 @@ pub fn build_with_limits(app: &AppHandle, edit_mb: u64, max_mb: u64) -> tauri::R
 
     Menu::with_items(
         app,
-        &[&file, &edit, &find, &selection, &view, &goto, &settings, &help],
+        &[&file, &edit, &find, &view, &goto, &settings, &help],
     )
 }
 
