@@ -1,6 +1,6 @@
 [package]
 name = "rocketnotepad"
-version = "0.2.8"
+version = "0.2.9"
 description = "A fast, lightweight local note pad - VSCode-like; macOS, Windows and Ubuntu (x86_64)"
 authors = ["maple"]
 default-run = "rocketnotepad"

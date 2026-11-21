@@ -1,7 +1,7 @@
 {
   "name": "rocketnotepad",
   "private": true,
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "低资源占用的本地笔记 / 代码编辑器（Rust + Tauri 2 + CodeMirror 6），支持 macOS、Windows 与 Ubuntu",
   "license": "Apache-2.0",
   "type": "module",
