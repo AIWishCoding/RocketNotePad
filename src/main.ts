@@ -667,14 +667,14 @@ async function closeAllTabs() {
   persistSettings();
 }
 
-async function removeTabsByPath(path: string) {
+async function removeTabsByPath(path: string, title = "文件已删除", hint = "被删除的文件") {
   const affected = tabs.filter(
     (t) => t.path === path || t.path?.startsWith(path + "/") || t.path?.startsWith(path + "\\")
   );
   if (affected.length === 0) return;
   if (affected.some((t) => t.dirty)) {
-    const ok = await ask("被删除的文件中有未保存的修改，确定关闭这些标签吗？", {
-      title: "文件已删除",
+    const ok = await ask(`${hint}有未保存的修改，确定关闭这些标签吗？`, {
+      title,
       kind: "warning",
       okLabel: "关闭",
       cancelLabel: "取消"
@@ -1142,7 +1142,8 @@ async function main() {
           persistSettings();
         }
       },
-      onDeleted: (path) => removeTabsByPath(path)
+      onDeleted: (path) => removeTabsByPath(path),
+      onCloseFolder: (dir) => removeTabsByPath(dir, "关闭文件夹", "该文件夹内")
     }
   );
   if (!settings.sidebarVisible) $("sidebar").classList.add("hidden");

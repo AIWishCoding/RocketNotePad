@@ -24,6 +24,8 @@ export interface SidebarHooks {
   onCreated: (path: string) => void;
   onRenamed: (from: string, to: string) => void;
   onDeleted: (path: string) => void;
+  /** 从工作区摘掉一个根文件夹：调用方负责关掉该文件夹下已打开的标签 */
+  onCloseFolder: (dir: string) => void;
 }
 
 type Pending =
@@ -203,8 +205,10 @@ export class Sidebar {
   private removeFolder(dir: string) {
     this.folders = this.folders.filter((f) => f !== dir);
     this.trees.delete(dir);
+    this.expanded.delete(dir);
     this.saveFolders();
     this.render();
+    void this.hooks.onCloseFolder(dir);
   }
 
   async refresh() {

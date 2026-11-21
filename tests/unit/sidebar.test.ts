@@ -37,6 +37,7 @@ interface Mounted {
   created: string[];
   renamed: Array<[string, string]>;
   deleted: string[];
+  closed: string[];
   addFolder: () => number;
 }
 
@@ -54,6 +55,7 @@ async function mount(options: TauriMockOptions & { folders?: string[] } = {}): P
   const created: string[] = [];
   const renamed: Array<[string, string]> = [];
   const deleted: string[] = [];
+  const closed: string[] = [];
   let addCount = 0;
   const sb = new Sidebar(
     $q("#sidebar"),
@@ -63,13 +65,14 @@ async function mount(options: TauriMockOptions & { folders?: string[] } = {}): P
     {
       onCreated: (p) => created.push(p),
       onRenamed: (from, to) => renamed.push([from, to]),
-      onDeleted: (p) => deleted.push(p)
+      onDeleted: (p) => deleted.push(p),
+      onCloseFolder: (d) => closed.push(d)
     }
   );
   // 与真实操作一致：先按住在侧边栏内，键盘命令才会生效
   mouse($q("#sidebar-tree"), "mousedown");
   await until(() => treeRows().length > 0 || !!document.querySelector(".sidebar-empty"));
-  return { sb, mock, opened, created, renamed, deleted, addFolder: () => addCount };
+  return { sb, mock, opened, created, renamed, deleted, closed, addFolder: () => addCount };
 }
 
 const input = (): HTMLInputElement => document.querySelector<HTMLInputElement>(".tree-input")!;
@@ -716,7 +719,7 @@ describe("右键菜单", () => {
   });
 
   it("根节点菜单可关闭文件夹并持久化", async () => {
-    await mount({
+    const { closed } = await mount({
       folders: ["/demo", "/other"],
       fs: { "/demo": null, "/demo/a.md": "x", "/other": null, "/other/b.md": "y" }
     });
@@ -726,6 +729,7 @@ describe("右键菜单", () => {
     await flush(20);
     expect([...cfg.folders]).toEqual(["/demo"]);
     expect(visibleTreeNames()).not.toContain("other");
+    expect(closed).toEqual(["/other"]);
   });
 
   it("点击菜单项后菜单关闭", async () => {
